@@ -1,0 +1,49 @@
+Challenge: day13-k3-observability-v1 | Cohort: K3
+Incident state: rag_slow=false
+Command: python scripts/load_test.py --challenge --concurrency 5
+data/logs.jsonl lines 58..68
+
+-- load_test.py stdout (client-side, gom ca overhead Langfuse export) --
+Challenge: day13-k3-observability-v1 | Cohort: K3
+[200] req-5ab65b65 | refund | 4698.3ms
+[200] req-23da8203 | refund | 5762.3ms
+[200] req-de91dcbe | refund | 5761.6ms
+[200] req-2823db27 | refund | 5762.7ms
+[200] req-ed4bdd1c | refund | 5761.8ms
+
+-- server-side latency_ms tu data/logs.jsonl (nguon chuan) --
+--- BASELINE (rag_slow=false) ---
+log lines analysed : 11 (from offset 58)
+request_received   : 5
+response_sent      : 5
+request_failed     : 0
+error_rate_pct     : 0.00 %
+latency_p50_ms     : 1061
+latency_p95_ms     : 1111
+latency_p99_ms     : 1111
+latency_min_ms     : 1028
+latency_max_ms     : 1111
+total_cost_usd     : 0.009651
+quality_avg        : 0.8600
+
+correlation_id | latency_ms | feature | session_id
+req-2823db27 |   1111 | refund | k3-challenge-s02
+req-5ab65b65 |   1103 | refund | k3-challenge-s04
+req-ed4bdd1c |   1061 | refund | k3-challenge-s03
+req-23da8203 |   1050 | refund | k3-challenge-s01
+req-de91dcbe |   1028 | refund | k3-challenge-s05
+
+-- GET /metrics sau baseline --
+{
+  "traffic": 5,
+  "latency_p50": 1061.0,
+  "latency_p95": 1111.0,
+  "latency_p99": 1111.0,
+  "avg_cost_usd": 0.0019,
+  "total_cost_usd": 0.0097,
+  "tokens_in_total": 162,
+  "tokens_out_total": 611,
+  "error_breakdown": {},
+  "error_rate_pct": 0.0,
+  "quality_avg": 0.86
+}
