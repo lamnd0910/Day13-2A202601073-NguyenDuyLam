@@ -4,13 +4,32 @@ slis:
   latency_p95_ms:
     objective: 3000
     target: 99.5
-    note: Replace with your group's target
+    source: data/logs.jsonl -> response_sent.latency_ms
+    note: >-
+      P95 phản ánh phần đuôi chậm mà average che mất. 3000 ms là mức người dùng
+      còn chờ được cho một lượt chat có RAG. Khớp threshold panel `latency`
+      (p95 lte 3000) trong config/dashboard.yaml.
   error_rate_pct:
     objective: 2
     target: 99.0
+    source: data/logs.jsonl -> count(request_failed) / count(request_received) * 100
+    note: >-
+      2% tương đương 1/50 request hỏng. Vượt ngưỡng này là mất chức năng thật
+      chứ không phải nhiễu thống kê. Khớp threshold panel `errors`
+      (error_rate_pct lte 2).
   daily_cost_usd:
     objective: 2.5
     target: 100.0
+    source: data/logs.jsonl -> sum(response_sent.cost_usd)
+    note: >-
+      Trần chi phí cho cửa sổ dashboard 60 phút. Cost tăng khi traffic không
+      tăng là dấu hiệu retry loop hoặc prompt phình. Khớp threshold panel `cost`
+      (total lte 2.5).
   quality_score_avg:
     objective: 0.75
     target: 95.0
+    source: data/logs.jsonl -> mean(response_sent.quality_score)
+    note: >-
+      Dưới 0.75 nghĩa là quality proxy mất điểm doc hoặc bị phạt vì PII bị
+      redact trong câu trả lời: chất lượng suy giảm dù latency và error vẫn
+      trong ngưỡng. Khớp threshold panel `quality` (mean gte 0.75).
