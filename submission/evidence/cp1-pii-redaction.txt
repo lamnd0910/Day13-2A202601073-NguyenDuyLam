@@ -1,0 +1,7 @@
+PII redaction evidence
+
+- Email preview: `My email is [REDACTED_EMAIL]`
+- Phone preview: `Here is my phone [REDACTED_PHONE_VN]`
+- Credit-card preview: `My card is [REDACTED_CREDIT_CARD]`
+- Raw email, phone, CCCD and credit-card values were not present in the validated log.
+- See `cp1-validate-logs.txt` for the independent validator result.
