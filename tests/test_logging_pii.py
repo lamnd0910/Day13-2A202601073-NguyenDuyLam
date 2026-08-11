@@ -1,35 +1,49 @@
-import json
-import os
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+
+from app import logging_config
+from app.logging_config import get_logger
 from app.main import app
 
-client = TestClient(app)
 
-def test_api_pii_redaction() -> None:
-    log_path = os.getenv("LOG_PATH", "data/logs.jsonl")
-    
-    response = client.post(
-        "/chat",
-        json={
-            "user_id": "u-456",
-            "session_id": "s-456",
-            "feature": "test",
-            "message": "My email is student@vinuni.edu.vn and my card is 4111 1111 1111 1111"
-        }
-    )
-    
+def test_api_pii_redaction(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / "logs.jsonl"
+    monkeypatch.setattr(logging_config, "LOG_PATH", log_path)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat",
+            json={
+                "user_id": "u-456",
+                "session_id": "s-456",
+                "feature": "test",
+                "message": (
+                    "My email is student@vinuni.edu.vn "
+                    "and my card is 4111 1111 1111 1111"
+                ),
+            },
+        )
+
     assert response.status_code == 200
-    
-    found_log = False
-    with open(log_path, "r", encoding="utf-8") as f:
-        for line in f:
-            log_entry = json.loads(line)
-            if log_entry.get("event") == "request_received" and log_entry.get("session_id") == "s-456":
-                found_log = True
-                payload_str = str(log_entry.get("payload", ""))
-                assert "student@" not in payload_str
-                assert "4111" not in payload_str
-                assert "REDACTED_EMAIL" in payload_str
-                assert "REDACTED_CREDIT_CARD" in payload_str
-    
-    assert found_log, "Log entry not found in logs.jsonl"
+
+    raw = log_path.read_text(encoding="utf-8")
+    assert "student@vinuni.edu.vn" not in raw
+    assert "4111 1111 1111 1111" not in raw
+    assert "REDACTED_EMAIL" in raw
+    assert "REDACTED_CREDIT_CARD" in raw
+
+
+def test_exception_message_is_scrubbed(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / "exception.jsonl"
+    monkeypatch.setattr(logging_config, "LOG_PATH", log_path)
+    logger = get_logger()
+
+    try:
+        raise ValueError("Contact student@vinuni.edu.vn")
+    except ValueError:
+        logger.exception("operation_failed")
+
+    raw = log_path.read_text(encoding="utf-8")
+    assert "student@vinuni.edu.vn" not in raw
+    assert "REDACTED_EMAIL" in raw

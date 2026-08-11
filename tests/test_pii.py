@@ -48,12 +48,12 @@ def test_recursive_scrub() -> None:
     data = {
         "user": {
             "email": "student@vinuni.edu.vn",
-            "phones": ["0901234567", "090 123 4567"]
+            "phones": ["0901234567", "090 123 4567"],
         },
-        "message": "Hello, here is my card 4111 1111 1111 1111"
+        "message": "Hello, here is my card 4111 1111 1111 1111",
     }
     scrubbed = recursive_scrub(data)
-    
+
     assert "student@" not in str(scrubbed)
     assert "0901234567" not in str(scrubbed)
     assert "4111" not in str(scrubbed)
