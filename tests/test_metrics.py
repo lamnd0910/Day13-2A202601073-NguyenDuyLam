@@ -38,3 +38,21 @@ def test_snapshot_has_no_division_by_zero(monkeypatch) -> None:
     monkeypatch.setattr(metrics, "ERRORS", metrics.Counter({"TimeoutError": 1}))
 
     assert metrics.snapshot()["error_rate_pct"] == 0.0
+
+
+def test_failed_request_counts_toward_traffic_and_error_rate(monkeypatch) -> None:
+    monkeypatch.setattr(metrics, "TRAFFIC", 0)
+    monkeypatch.setattr(metrics, "ERRORS", metrics.Counter())
+    monkeypatch.setattr(metrics, "REQUEST_LATENCIES", [])
+    monkeypatch.setattr(metrics, "REQUEST_COSTS", [])
+    monkeypatch.setattr(metrics, "REQUEST_TOKENS_IN", [])
+    monkeypatch.setattr(metrics, "REQUEST_TOKENS_OUT", [])
+    monkeypatch.setattr(metrics, "QUALITY_SCORES", [])
+
+    metrics.record_request(100, 0.1, 10, 20, 0.8)
+    metrics.record_error("TimeoutError")
+
+    result = metrics.snapshot()
+    assert result["traffic"] == 2
+    assert result["error_rate_pct"] == 50.0
+    assert result["error_breakdown"] == {"TimeoutError": 1}

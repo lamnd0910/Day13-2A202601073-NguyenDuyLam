@@ -24,6 +24,10 @@ def record_request(latency_ms: int, cost_usd: float, tokens_in: int, tokens_out:
 
 
 def record_error(error_type: str) -> None:
+    global TRAFFIC
+    # Failed requests never reach ``record_request`` in app.main, therefore
+    # they must be counted here so traffic and error-rate use all requests.
+    TRAFFIC += 1
     ERRORS[error_type] += 1
 
 

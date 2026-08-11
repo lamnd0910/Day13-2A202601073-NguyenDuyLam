@@ -36,9 +36,11 @@ def load_recent_events(path: Path, now: datetime | None = None) -> list[dict[str
         try:
             event = json.loads(line)
             timestamp = datetime.fromisoformat(event["ts"].replace("Z", "+00:00"))
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             continue
-        if timestamp >= cutoff:
+        if cutoff <= timestamp <= now:
             event["_timestamp"] = timestamp
             events.append(event)
     return events
@@ -53,6 +55,10 @@ def calculate_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
     tokens_in = sum(int(event.get("tokens_in", 0) or 0) for event in responses)
     tokens_out = sum(int(event.get("tokens_out", 0) or 0) for event in responses)
     scores = [float(event["quality_score"]) for event in responses if isinstance(event.get("quality_score"), (int, float))]
+    requests_by_minute: dict[str, int] = defaultdict(int)
+    for event in requests:
+        if event.get("_timestamp"):
+            requests_by_minute[event["_timestamp"].strftime("%H:%M")] += 1
     costs_by_minute: dict[str, float] = defaultdict(float)
     for event in responses:
         if isinstance(event.get("cost_usd"), (int, float)) and event.get("_timestamp"):
@@ -63,6 +69,7 @@ def calculate_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
         "p95": percentile(latencies, 95),
         "p99": percentile(latencies, 99),
         "traffic_per_minute": len(requests) / TIME_RANGE_MINUTES,
+        "traffic_by_minute": dict(requests_by_minute),
         "error_rate_pct": len(failures) / len(requests) * 100 if requests else 0.0,
         "error_breakdown": Counter(str(event.get("error_type", "unknown")) for event in failures),
         "cost_by_minute": dict(costs_by_minute),
@@ -74,11 +81,6 @@ def calculate_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def render_dashboard(metrics: dict[str, Any]) -> None:
-    st.set_page_config(page_title="Day 13 Observability", layout="wide")
-    st.title("Day 13 AI Observability")
-    st.caption("Time range: 60 minutes · Refresh: 30 seconds · Source: data/logs.jsonl")
-    st.autorefresh(interval=REFRESH_SECONDS * 1000, key="dashboard-refresh")
-
     latency, traffic, errors = st.columns(3)
     with latency:
         st.subheader("Latency")
@@ -90,6 +92,7 @@ def render_dashboard(metrics: dict[str, Any]) -> None:
         st.subheader("Traffic")
         st.caption("Unit: requests/minute · Threshold: ≥ 1 request/minute")
         st.metric("Requests/minute", f"{metrics['traffic_per_minute']:.2f}")
+        st.bar_chart(metrics["traffic_by_minute"])
     with errors:
         st.subheader("Errors")
         st.caption("Unit: percent · SLO: error rate ≤ 2%")
@@ -113,8 +116,17 @@ def render_dashboard(metrics: dict[str, Any]) -> None:
         st.metric("Average quality", f"{metrics['quality_avg']:.2f}")
 
 
-def main() -> None:
+@st.fragment(run_every=REFRESH_SECONDS)
+def render_live_dashboard() -> None:
+    """Refresh only the six live panels every 30 seconds."""
     render_dashboard(calculate_metrics(load_recent_events(LOG_PATH)))
+
+
+def main() -> None:
+    st.set_page_config(page_title="Day 13 Observability", layout="wide")
+    st.title("Day 13 AI Observability")
+    st.caption("Time range: 60 minutes · Refresh: 30 seconds · Source: data/logs.jsonl")
+    render_live_dashboard()
 
 
 if __name__ == "__main__":
